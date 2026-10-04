@@ -1,5 +1,5 @@
 ---
-name: Check upstream stable
+name: Prepare upstream stable review
 
 "on":
   workflow_dispatch:
@@ -7,16 +7,26 @@ name: Check upstream stable
     - cron: "17 6 * * 1"
 
 permissions:
-  contents: read
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-stable-review
+  cancel-in-progress: false
 
 jobs:
   compare:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
 
-      - name: Compare pinned and current stable commits
+      - name: Prepare a draft integration review when upstream changes
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           repository="$(awk '$1 == "repository:" { print $2 }' UPSTREAM.lock)"
@@ -41,12 +51,63 @@ jobs:
           fi
 
           if [[ "$current" != "$pinned" ]]; then
-            message="Upstream changed. Review is required."
+            review_branch="automation/upstream-stable-${current:0:12}"
+            if git ls-remote --exit-code --heads origin "$review_branch"; then
+              echo "Review branch already exists: $review_branch" \
+                >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            upstream_dir="$RUNNER_TEMP/apparmor.d"
+            git init --bare "$upstream_dir"
+            git -C "$upstream_dir" remote add origin "$repository"
+            git -C "$upstream_dir" fetch \
+              --no-tags \
+              --filter=blob:none \
+              origin \
+              "$pinned" \
+              "$current"
+
+            report_dir="reviews/upstream/${pinned:0:12}..${current:0:12}"
+            python3 tools/prepare_upstream_review.py \
+              --upstream-dir "$upstream_dir" \
+              --repository-url "$repository" \
+              --branch "$branch" \
+              --old "$pinned" \
+              --new "$current" \
+              --output "$report_dir" \
+              --lock UPSTREAM.lock
+
+            python3 -m unittest discover -s tests -v
+            python3 -m py_compile tools/prepare_upstream_review.py
+
+            git config user.name "github-actions[bot]"
+            git config \
+              user.email \
+              "41898282+github-actions[bot]@users.noreply.github.com"
+            git switch -c "$review_branch"
+            git add UPSTREAM.lock "$report_dir"
+            git commit \
+              -m "Review apparmor.d stable update to ${current:0:12}"
+            gh auth setup-git
+            git push --set-upstream origin "$review_branch"
+
+            pr_url="$(
+              gh pr create \
+                --draft \
+                --base main \
+                --head "$review_branch" \
+                --title \
+                  "Review apparmor.d stable update to ${current:0:12}" \
+                --body-file "$report_dir/SUMMARY.md"
+            )"
+            gh pr comment "$pr_url" --body "@codex security review"
+
             {
-              echo "$message"
-              echo "Nothing was modified or deployed."
+              echo "Created draft integration review: $pr_url"
+              echo "No package or policy was deployed."
             } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
+            exit 0
           fi
 
           message="The observation pin is current. No action was taken."

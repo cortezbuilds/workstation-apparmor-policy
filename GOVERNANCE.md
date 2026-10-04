@@ -20,6 +20,12 @@ Automation must not:
 When human security judgment is unavailable, the workflow stops at a draft
 review.
 
+The scheduled upstream workflow is allowed to create a write-limited draft
+branch and pull request containing only an updated observation pin and generated
+review evidence. It must verify that the candidate commit is a fast-forward of
+the pin, must not execute upstream code, and must not touch package or
+deployment state.
+
 ## State model
 
 The following states are deliberately independent:
