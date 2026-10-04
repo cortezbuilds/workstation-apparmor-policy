@@ -26,7 +26,9 @@ that is not intended to replace the general upstream project.
 ## Update procedure
 
 1. Read the current `stable` head without modifying downstream state.
-2. If it differs from `UPSTREAM.lock`, create a draft integration change.
+2. If it differs from `UPSTREAM.lock`, verify that the update is a
+   fast-forward and create a draft integration change. A non-fast-forward stops
+   automatically for investigation.
 3. Record the old and new commit IDs.
 4. Review all changed profiles, abstractions, tunables, build logic, and tests.
 5. Reapply the explicit downstream patch series without silently resolving
@@ -35,6 +37,12 @@ that is not intended to replace the general upstream project.
 7. Run parser, build, semantic checks, and isolated workflow tests.
 8. Request security-oriented Codex review.
 9. Leave the change in draft until explicit approval.
+
+The current workflow creates an `automation/upstream-stable-<sha>` branch,
+commits the pending observation pin plus generated review inventories, opens a
+draft PR, and comments `@codex security review`. The comment only produces a
+Codex Security review when the repository is connected and enabled for that
+service.
 
 ## Contribution boundary
 

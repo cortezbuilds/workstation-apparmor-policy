@@ -50,6 +50,13 @@ in [`UPSTREAM.lock`](UPSTREAM.lock).
 | Automatic deployment | Prohibited |
 | Enforcement authorization | None |
 
+The implemented upstream workflow checks `apparmor.d/stable` weekly. When the
+branch advances by a verified fast-forward, it creates a draft integration PR
+containing an updated observation pin and machine-readable security-semantic
+inventory. It requests Codex Security review with
+`@codex security review`. Repository access must be enabled separately in
+Codex Security for that request to produce a review.
+
 ## Documents
 
 - [Threat model](THREAT-MODEL.md)
@@ -74,6 +81,13 @@ in [`UPSTREAM.lock`](UPSTREAM.lock).
 5. Never place credentials, private host inventory, raw audit logs, or signing
    keys in this public repository.
 6. Stop at a draft review when human security judgment is unavailable.
+
+## Local verification
+
+```bash
+python3 -m unittest discover -s tests -v
+python3 -m py_compile tools/prepare_upstream_review.py
+```
 
 ## License
 
