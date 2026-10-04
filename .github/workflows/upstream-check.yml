@@ -1,0 +1,53 @@
+---
+name: Check upstream stable
+
+"on":
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+
+      - name: Compare pinned and current stable commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="$(awk '$1 == "repository:" { print $2 }' UPSTREAM.lock)"
+          branch="$(awk '$1 == "tracking_branch:" { print $2 }' UPSTREAM.lock)"
+          pinned="$(awk '$1 == "commit:" { print $2 }' UPSTREAM.lock)"
+          current="$(
+            git ls-remote "$repository" "refs/heads/$branch" |
+              awk '{ print $1 }'
+          )"
+
+          {
+            echo "## apparmor.d upstream check"
+            echo
+            echo "- Tracking branch: $branch"
+            echo "- Pinned commit: $pinned"
+            echo "- Current commit: $current"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ -z "$current" ]]; then
+            echo "Unable to resolve upstream branch." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          if [[ "$current" != "$pinned" ]]; then
+            message="Upstream changed. Review is required."
+            {
+              echo "$message"
+              echo "Nothing was modified or deployed."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          message="The observation pin is current. No action was taken."
+          echo "$message" >> "$GITHUB_STEP_SUMMARY"

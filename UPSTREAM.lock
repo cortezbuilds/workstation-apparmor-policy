@@ -1,0 +1,9 @@
+---
+schema: 1
+repository: https://github.com/roddhjav/apparmor.d.git
+tracking_branch: stable
+commit: 486f3279ea43074b649a7b35998ff53ffad5563c
+source_sha256: null
+last_reviewed: null
+deployment_status: not_deployed
+note: Initial observation pin; not an approved deployment baseline.
